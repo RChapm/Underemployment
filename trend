@@ -1,4 +1,8 @@
+library(lubridate)
 getwd()
-z <- read.table('U6RATENSA.csv', skip = 10, header = T)
+z <- read.csv('U6RATENSA.csv', skip = 10, header = T)
 
 head(z)
+U_Emp=ts(z$Underemployment,start=1994,freq=12)
+print(U_Emp)
+plot(U_Emp)
