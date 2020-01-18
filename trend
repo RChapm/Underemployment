@@ -1,1 +1,4 @@
+getwd()
+z <- read.table('U6RATENSA.csv', skip = 10, header = T)
 
+head(z)
