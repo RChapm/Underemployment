@@ -7,16 +7,12 @@ output:
 ---
 Libraries used in this project:
 ```{r setup}
-library(forecast, quietly=TRUE) # silently imports the library
+suppressPackageStartupMessages(library(forecast)) # silently adds library
 library(stats)
 rm(list=ls()) # removes previous variables
 ```
 
-<!-- Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*. -->
-
-<!-- When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file). -->
-
-<!-- The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed. -->
+<!-- click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file. -->
 
 Import the data
 ```{r import_csv}
@@ -35,19 +31,30 @@ UnEmp=ts(csv$unemp[-(1:167)],start=c(2007,12),freq=12)
 plot(UnEmp)
 ```
 
-Seasonality model
+# 2. Modeling and Forecasting Seasonality
+**(a) Construct and test (by looking at the diagnostic statistics) a model with a full set of seasonal dummies.**
+
+Construct the seasonal model `seas` and print out a summary. The model formula is $$UNEMP_t=\beta_1+\beta_2FEB_t+\beta_3MAR_t+...+\beta_{12}DEC_t+\varepsilon_t$$
+where $FEB_t$, $MAR_t$,..., $DEC_t$ are indicator variables for the months less January.
 ```{r}
-seas=tslm(UnEmp~season)
-(s_seas=summary(seas))
+seas=tslm(UnEmp~season) # linear regress on seasonal indicators
+(s_seas=summary(seas)) # regression summary
 ```
+None of the seasonal coefficients are significant at 5% level. The statistics $R^2$ and $R^2_{\mathrm{adj}}$  are close to 0, and the $p$-value for the $F$-statistic is very high, all seems to suggest that this is a fairly bad model.
+
+Here we plot the seasonal coefficients. The reference is set at the average of the months.
 ```{r}
-seas_factors=seas$coef
-seas_factors[1]=0 # throw out the intercept
-names(seas_factors)[1]='season1'
+seas_factors=seas$coef # copy the regression coefs over
+seas_factors[1]=0 # zero the value of the intercept
+names(seas_factors)[1]='season1' # rename (Intercept) to season1
+seas_factor=seas_factors-mean(seas_factors)
+
 plot(seas_factors, type='l', lwd=2,
      xlab="Month", ylab='Seasonal Factors',
      main="Plot of Seasonal Factors")
+
 ```
+
 Plot the residuals
 ```{r}
 hist(seas$res,main='Histogram of Residuals',col='grey')
@@ -56,24 +63,42 @@ plot(seas$res)
 ```
 
 
-# Fiddle
+
+
+
+# Fiddle 1
+Take the first difference
 ```{r}
 d_UnEmp=UnEmp-lag(UnEmp,-1)
-d_UnEmp
 plot(d_UnEmp,
      xlab='Year',
      ylab='Change in Unemployment, p.p.',
      main='Monthly Changes in Unemployment')
 ```
 
-
+# regress out the seasonal factors
 ```{r}
-log_UnEmp=log(UnEmp)
-plot(log_UnEmp)
-plot(log_UnEmp-lag(log_UnEmp,-1))
+seas_d_UnEmp=tslm(d_UnEmp~season)
+s_seas_d_UnEmp=summary(seas_d_UnEmp)
+plot(d_UnEmp)
+lines(seas_d_UnEmp$fitted.values,col='red')
+plot(s_seas_d_UnEmp$residuals)
 ```
 
+acf and pacf of the residuals
+```{r}
+acf(s_seas_d_UnEmp$res)
+pacf(s_seas_d_UnEmp$res)
+```
 
+# Fiddle 2
+```{r}
+dd_UnEmp=d_UnEmp-lag(d_UnEmp,-1)
+plot(dd_UnEmp,main = "Second difference in unemployment")
+```
+This is useless because the noise got amplified by taking the difference
+
+# Fiddle 3
 ```{r non-linear}
 adj_t=time(UnEmp)-2008
 nltrend=nls(UnEmp~a*exp(-k*adj_t)+b*adj_t+c*adj_t**2+f,
