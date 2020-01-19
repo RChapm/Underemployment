@@ -21,9 +21,37 @@ output:
 
 Import the data
 ```{r}
-z <- read.csv('U6.csv', skip = 10, header = T)
-U_Emp=ts(z[,1],start=c(2009,6),end=c(2019,12),freq=12)
-print(U_Emp)
-plot(U_Emp)
+rm(list=ls())
+z<-read.csv('rawdata.csv', skip = 0, header = TRUE)
+
+z=z[-(1:167),]
+print(z)
+names(z)[[2]]="Underemployment"
+#print(z)
+UnEmp=ts(z$Underemployment,start=c(2007,12),freq=12)
+plot(UnEmp)
+diffUnEmp=lag(UnEmp)-UnEmp
+UnEmp
+diffUnEmp
+#plot(UnEmp-dynlm::L(UnEmp))
+plot(log(UnEmp))
+curve(dpois(x,lambda=2),from=0,to=100)
+```
+
+Do the seasonality model
+```{r}
+suppressPackageStartupMessages(library(forecast))
+seas=tslm(UnEmp~season)
+seas
+```
+```{r}
+seas_factors=seas$coef
+seas_factors[1]=0
+names(seas_factors)[1]='season1'
+plot(seas_factors,type='l',ylab='Seasonal Factors', xlab="Month",lwd=2, main="Plot of Seasonal Factors")
+```
+
+```{r}
+hist(seas$res,main="Histogram of Residuals",col="skyblue3")
 ```
 
