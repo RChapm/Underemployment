@@ -1,9 +1,15 @@
 ---
-title: "R Notebook"
+title: "Seasonality"
+author: "David Su"
 output:
   html_document:
     df_print: paged
 ---
+Libraries used in this project:
+```{r setup}
+library(forecast, quietly=TRUE) # silently imports the library
+rm(list=ls()) # removes previous variables
+```
 
 <!-- This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.  -->
 
@@ -20,38 +26,62 @@ output:
 <!-- The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed. -->
 
 Import the data
-```{r}
-rm(list=ls())
-z<-read.csv('rawdata.csv', skip = 0, header = TRUE)
-
-z=z[-(1:167),]
-print(z)
-names(z)[[2]]="Underemployment"
-#print(z)
-UnEmp=ts(z$Underemployment,start=c(2007,12),freq=12)
-plot(UnEmp)
-diffUnEmp=lag(UnEmp)-UnEmp
-UnEmp
-diffUnEmp
-#plot(UnEmp-dynlm::L(UnEmp))
-plot(log(UnEmp))
-curve(dpois(x,lambda=2),from=0,to=100)
+```{r import_csv}
+csv<-read.csv('rawdata.csv', header = TRUE)
+names(csv)=c('date','unemp')
+head(csv)
 ```
 
-Do the seasonality model
+Select data starting from the last NBER recession, i.e. December 2017.
 ```{r}
-suppressPackageStartupMessages(library(forecast))
-seas=tslm(UnEmp~season)
-seas
+head(csv[-(1:167),])
+```
+Construct the time series object and plot it
+```{r}
+UnEmp=ts(csv$unemp[-(1:167)],start=c(2007,12),freq=12)
+plot(UnEmp)
+```
+
+Seasonality model
+```{r}
+seas=tslm(UnEmp~season+trend)
+(s_seas=summary(seas))
 ```
 ```{r}
 seas_factors=seas$coef
-seas_factors[1]=0
+seas_factors[1]=0 # throw out the intercept
 names(seas_factors)[1]='season1'
-plot(seas_factors,type='l',ylab='Seasonal Factors', xlab="Month",lwd=2, main="Plot of Seasonal Factors")
+plot(seas_factors,type='l',lwd=2,
+     xlab="Month", ylab='Seasonal Factors',
+     main="Plot of Seasonal Factors")
+```
+Plot the residuals
+```{r}
+hist(seas$res,main='Histogram of Residuals',col='grey')
+plot(seas$res)
+
 ```
 
+
+Fiddle
 ```{r}
-hist(seas$res,main="Histogram of Residuals",col="skyblue3")
+d_UnEmp=UnEmp-lag(UnEmp,-1)
+d_UnEmp
+plot(d_UnEmp,
+     xlab='Year',
+     ylab='Change in Unemployment, p.p.',
+     main='Monthly Changes in Unemployment')
+```
+
+
+```{r}
+log_UnEmp=log(UnEmp)
+plot(log_UnEmp)
+plot(log_UnEmp-lag(log_UnEmp,-1))
+```
+
+
+```{r}
+
 ```
 
