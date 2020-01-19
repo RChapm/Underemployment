@@ -8,16 +8,9 @@ output:
 Libraries used in this project:
 ```{r setup}
 library(forecast, quietly=TRUE) # silently imports the library
+library(stats)
 rm(list=ls()) # removes previous variables
 ```
-
-<!-- This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.  -->
-
-<!-- Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*.  -->
-
-<!-- ```{r} -->
-<!-- plot(cars) -->
-<!-- ``` -->
 
 <!-- Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*. -->
 
@@ -44,14 +37,14 @@ plot(UnEmp)
 
 Seasonality model
 ```{r}
-seas=tslm(UnEmp~season+trend)
+seas=tslm(UnEmp~season)
 (s_seas=summary(seas))
 ```
 ```{r}
 seas_factors=seas$coef
 seas_factors[1]=0 # throw out the intercept
 names(seas_factors)[1]='season1'
-plot(seas_factors,type='l',lwd=2,
+plot(seas_factors, type='l', lwd=2,
      xlab="Month", ylab='Seasonal Factors',
      main="Plot of Seasonal Factors")
 ```
@@ -63,7 +56,7 @@ plot(seas$res)
 ```
 
 
-Fiddle
+# Fiddle
 ```{r}
 d_UnEmp=UnEmp-lag(UnEmp,-1)
 d_UnEmp
@@ -81,7 +74,31 @@ plot(log_UnEmp-lag(log_UnEmp,-1))
 ```
 
 
-```{r}
+```{r non-linear}
+adj_t=time(UnEmp)-2008
+nltrend=nls(UnEmp~a*exp(-k*adj_t)+b*adj_t+c*adj_t**2+f,
+    start=c(a=-10,k=1,b=-1,c=0,f=20))
+s_nltrend=summary(nltrend)
+print(s_nltrend)
+# residual plot
+plot(s_nltrend$res,type='l')
 
+trend_res=ts(s_nltrend$res,start=c(2007,12),freq=12)
+trend_fitted=UnEmp-trend_res
+
+plot(UnEmp)
+lines(trend_fitted,col='red')
+
+# seasonal model on the residuals of trend
+seas_on_res=tslm(trend_res~season)
+s_seas_on_res=summary(seas_on_res)
+print(s_seas_on_res)
+
+# residuals of seasonal model
+plot(s_seas_on_res$res)
+
+
+plot(UnEmp)
+lines(trend_fitted+seas_on_res$fitted.values,col='red')
 ```
 
