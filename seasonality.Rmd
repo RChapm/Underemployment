@@ -25,49 +25,70 @@ Select data starting from the last NBER recession, i.e. December 2017.
 ```{r}
 head(csv[-(1:167),])
 ```
-Construct the time series object and plot it
-```{r}
+
+Construct the time series object.
+```{r UnEmp-ts}
 UnEmp=ts(csv$unemp[-(1:167)],start=c(2007,12),freq=12)
+```
+
+Plot the time series.
+```{r UnEmp-plot}
 plot(UnEmp)
 ```
 
 # 2. Modeling and Forecasting Seasonality
 **(a) Construct and test (by looking at the diagnostic statistics) a model with a full set of seasonal dummies.**
 
-Construct the seasonal model `seas` and print out a summary. The model formula is $$UNEMP_t=\beta_1+\beta_2FEB_t+\beta_3MAR_t+...+\beta_{12}DEC_t+\varepsilon_t$$
-where $FEB_t$, $MAR_t$,..., $DEC_t$ are indicator variables for the months less January.
+Construct the seasonal model `seas` and print out a summary. The model formula is
+$$UNEMP_t=\beta_1+\sum_{m=2}^{12}\delta_mMONTH_{mt}+\varepsilon_t$$
+where $MONTH_m$ are indicator variables for the months February and on.
 ```{r}
 seas=tslm(UnEmp~season) # linear regress on seasonal indicators
 (s_seas=summary(seas)) # regression summary
 ```
-None of the seasonal coefficients are significant at 5% level. The statistics $R^2$ and $R^2_{\mathrm{adj}}$  are close to 0, and the $p$-value for the $F$-statistic is very high, all seems to suggest that this is a fairly bad model.
 
-Here we plot the seasonal coefficients. The reference is set at the average of the months.
+Looking at the poor regression statistics, we must not haste to conclude that there is no seasonal effect. First, we examine the regression coefficients and their standard errors: none of the seasonal coefficients have $p$-values less than 5%. This is because we omitted trend from our model, and now our error term $\varepsilon_t$ is no longer centered around zero. This omission produces two effects on the our regression:
+
+1. the estimated coefficients for $MONTH_{m}$ will be biased, and
+2. the estimated variances for $MONTH_{m}$ will be incorrect.
+
+The variation in the trend mixes into the error term, then into the incorrect standard error calculation, producing artificially large standard errors and p-values. This does not mean that there is no seasonal trend. This only means that our model has left out crucial information (i.e. trend) and therefore is doing a poor job predicting the variation in the data. In addition to the poor statistics of the coefficents, $R^2$ and $R^2_{\mathrm{adj}}$  are close to 0, and the $p$-value for the $F$-statistic is very high, all suggesting that our model is not the complete story.
+
+Of course, when we plot the residuals, we will see the glaring trend:
 ```{r}
-seas_factors=seas$coef # copy the regression coefs over
-seas_factors[1]=0 # zero the value of the intercept
+plot(seas$res,
+     xlab='Year',ylab='Unemployment rate, p.p.',
+     main='Residuals of the Seasonal Model')
+```
+
+This suggests that to improve the model, we must add in the trend in our regression.
+
+
+**(b) Plot the estimated seasonal factors and interpret your plot.**
+Now we plot the seasonal coefficients. The reference is set in January.
+```{r}
+seas_factors=seas$coef # save the regression coefs
+
+seas_factors[1]=0 # zero the value of the corresponding to the intercept
 names(seas_factors)[1]='season1' # rename (Intercept) to season1
-seas_factor=seas_factors-mean(seas_factors)
 
 plot(seas_factors, type='l', lwd=2,
-     xlab="Month", ylab='Seasonal Factors',
-     main="Plot of Seasonal Factors")
-
+     xlab="Month", ylab='Unemployment rate, p.p.',
+     main="Plot of Seasonal Effects on Unemployment Rate")
 ```
 
-Plot the residuals
-```{r}
-hist(seas$res,main='Histogram of Residuals',col='grey')
-plot(seas$res)
-
-```
+Our simple seasonal model 
+$$UNEMP_t=\beta_1+\sum_{m=2}^{12}\delta_mMONTH_{mt}+\varepsilon_t$$
+is an roundabout way of saying that we are finding the average unemployment rate for each other month, and comparing them to that of January. For example, the regression coefficients $\delta_4$ for April is -1.5167, which means that compared to January, the average unemplyment rate in April is 1.5167 percentage points lower. In the plot above, we see there are peaks in unemployment rate in winter and summer, and troughs in spring and fall. This is because in winter and summer, ?????????????????????????????????????????????????????????????????????????????????????????
 
 
+**(c) In order to improve your model, add the trend model from problem 1 to your seasonal model. We will refer to this model as the full model. For the full model, plot the respective residuals vs. fitted values and discuss your observations.**
 
 
 
-# Fiddle 1
-Take the first difference
+# Fiddle
+
+## First difference
 ```{r}
 d_UnEmp=UnEmp-lag(UnEmp,-1)
 plot(d_UnEmp,
@@ -76,7 +97,7 @@ plot(d_UnEmp,
      main='Monthly Changes in Unemployment')
 ```
 
-# regress out the seasonal factors
+Regress out the seasonal factors
 ```{r}
 seas_d_UnEmp=tslm(d_UnEmp~season)
 s_seas_d_UnEmp=summary(seas_d_UnEmp)
@@ -85,45 +106,107 @@ lines(seas_d_UnEmp$fitted.values,col='red')
 plot(s_seas_d_UnEmp$residuals)
 ```
 
-acf and pacf of the residuals
+Acf and pacf of the residuals
 ```{r}
 acf(s_seas_d_UnEmp$res)
 pacf(s_seas_d_UnEmp$res)
 ```
 
-# Fiddle 2
+## Second difference
 ```{r}
 dd_UnEmp=d_UnEmp-lag(d_UnEmp,-1)
 plot(dd_UnEmp,main = "Second difference in unemployment")
 ```
+
 This is useless because the noise got amplified by taking the difference
 
-# Fiddle 3
+## Non-linear trend only
 ```{r non-linear}
 adj_t=time(UnEmp)-2008
 nltrend=nls(UnEmp~a*exp(-k*adj_t)+b*adj_t+c*adj_t**2+f,
     start=c(a=-10,k=1,b=-1,c=0,f=20))
 s_nltrend=summary(nltrend)
 print(s_nltrend)
+```
+
+Residual of non-linear trend
+```{r}
 # residual plot
 plot(s_nltrend$res,type='l')
+```
 
+Goodness of fit of non-linear trend
+```{r}
 trend_res=ts(s_nltrend$res,start=c(2007,12),freq=12)
 trend_fitted=UnEmp-trend_res
-
 plot(UnEmp)
 lines(trend_fitted,col='red')
+```
 
+# Regress non-linear trend, then seasonal effects, sequentially
+```{r}
 # seasonal model on the residuals of trend
 seas_on_res=tslm(trend_res~season)
 s_seas_on_res=summary(seas_on_res)
 print(s_seas_on_res)
+```
 
-# residuals of seasonal model
+Seasonal factors
+```{r}
+seas_factor2=seas_on_res$coefficients
+seas_factor2[[1]]=0
+plot(seas_factor2,type='l')
+```
+
+residuals of seasonal model
+```{r}
 plot(s_seas_on_res$res)
+```
 
-
+Adding two models
+```{r}
 plot(UnEmp)
 lines(trend_fitted+seas_on_res$fitted.values,col='red')
+```
+
+
+## trend and season non-linear regression
+```{r}
+m2=abs((adj_t*12)%%12+1-2)<0.5
+m3=abs((adj_t*12)%%12+1-3)<0.5
+m4=abs((adj_t*12)%%12+1-4)<0.5
+m5=abs((adj_t*12)%%12+1-5)<0.5
+m6=abs((adj_t*12)%%12+1-6)<0.5
+m7=abs((adj_t*12)%%12+1-7)<0.5
+m8=abs((adj_t*12)%%12+1-8)<0.5
+m9=abs((adj_t*12)%%12+1-9)<0.5
+m10=abs((adj_t*12)%%12+1-10)<0.5
+m11=abs((adj_t*12)%%12+1-11)<0.5
+m12=abs((adj_t*12)%%12+1-12)<0.5
+
+full=nls(UnEmp~a*exp(-k*adj_t)+b*adj_t+c*adj_t**2+f+b2*m2+b3*m3+b4*m4+b5*m5+b6*m6+b7*m7+b8*m8+b9*m9+b10*m10+b11*m11+b12*m12,
+    start=c(a=-10,k=1,b=-1,c=0,f=20,b2=0.1,b3=0.1,b4=0.1,b5=0.1,b6=0.1,b7=0.1,b8=0.1,b9=0.1,b10=0.1,b11=0.1,b12=0.1))
+s_full=summary(full)
+print(s_full)
+full_res=ts(s_full$res,start=c(2007,12),freq=12)
+full_fitted=UnEmp-full_res
+plot(UnEmp)
+lines(full_fitted,col='red')
+```
+
+Seasonal factors
+```{r}
+seas_factor3=s_full$coefficients[seq(5,16),1]
+seas_factor3[[1]]=0
+plot(seas_factor3,type='l')
+```
+
+
+## Regress independently and add
+```{r}
+seas_fitted=seas$fitted.values-mean(seas$fitted.values) # adjust mean
+sum_fitted=trend_fitted+seas_fitted # sum
+plot(UnEmp)
+lines(sum_fitted,col='red')
 ```
 
